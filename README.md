@@ -2,6 +2,8 @@
 
 MediConnect is a full-stack healthcare appointment booking system built with the MERN stack.
 
+This repository originated from the `CareSlot` project name on GitHub.
+
 ## Stack
 
 - Frontend: React.js, Tailwind CSS, Framer Motion, React Router, Axios, React Icons, Toastify
