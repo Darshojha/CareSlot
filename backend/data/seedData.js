@@ -1,3 +1,58 @@
+const slotPool = [
+  '08:30 AM',
+  '09:30 AM',
+  '10:30 AM',
+  '11:30 AM',
+  '01:00 PM',
+  '02:00 PM',
+  '03:00 PM',
+  '04:00 PM',
+  '05:00 PM'
+];
+
+const hashString = (value) =>
+  String(value)
+    .split('')
+    .reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) >>> 0, 0);
+
+const createRandom = (seed) => {
+  let state = hashString(seed) || 1;
+  return () => {
+    state = (1664525 * state + 1013904223) % 4294967296;
+    return state / 4294967296;
+  };
+};
+
+const shuffle = (items, seed) => {
+  const random = createRandom(seed);
+  const values = [...items];
+  for (let index = values.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+  }
+  return values;
+};
+
+const timeToMinutes = (value) => {
+  const [time, modifier] = value.split(' ');
+  const [rawHour, rawMinute] = time.split(':').map(Number);
+  let hour = rawHour;
+  if (modifier === 'PM' && hour !== 12) hour += 12;
+  if (modifier === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + rawMinute;
+};
+
+const buildAvailability = (seed) => {
+  const randomDays = shuffle([0, 1, 2, 3, 4, 5, 6], `${seed}:days`).slice(0, 3).sort((a, b) => a - b);
+  const randomSlots = shuffle(slotPool, `${seed}:slots`);
+  return randomDays.map((dayOfWeek, index) => ({
+    dayOfWeek,
+    slots: randomSlots
+      .slice(index * 3, index * 3 + 3)
+      .sort((left, right) => timeToMinutes(left) - timeToMinutes(right))
+  }));
+};
+
 export const doctorSeedData = [
   {
     name: 'Dr. Aanya Sharma',
@@ -7,12 +62,7 @@ export const doctorSeedData = [
     experience: 12,
     fee: 800,
     ratings: 4.9,
-    about: 'Cardiologist focused on preventive care, hypertension, and long-term heart health.',
-    availability: [
-      { dayOfWeek: 1, slots: ['09:00 AM', '10:00 AM', '11:30 AM'] },
-      { dayOfWeek: 3, slots: ['02:00 PM', '03:00 PM', '04:00 PM'] },
-      { dayOfWeek: 5, slots: ['10:00 AM', '11:00 AM', '12:00 PM'] }
-    ]
+    about: 'Cardiologist focused on preventive care, hypertension, and long-term heart health.'
   },
   {
     name: 'Dr. Rahul Mehta',
@@ -22,12 +72,7 @@ export const doctorSeedData = [
     experience: 9,
     fee: 650,
     ratings: 4.7,
-    about: 'Dermatologist handling acne, skin allergies, pigmentation, and routine skin checkups.',
-    availability: [
-      { dayOfWeek: 2, slots: ['10:00 AM', '11:00 AM', '01:00 PM'] },
-      { dayOfWeek: 4, slots: ['09:30 AM', '10:30 AM', '03:00 PM'] },
-      { dayOfWeek: 6, slots: ['11:00 AM', '12:00 PM', '01:30 PM'] }
-    ]
+    about: 'Dermatologist handling acne, skin allergies, pigmentation, and routine skin checkups.'
   },
   {
     name: 'Dr. Priya Nair',
@@ -37,12 +82,7 @@ export const doctorSeedData = [
     experience: 11,
     fee: 700,
     ratings: 4.8,
-    about: 'Pediatrician offering child wellness visits, vaccinations, and general consultations.',
-    availability: [
-      { dayOfWeek: 1, slots: ['08:30 AM', '09:30 AM', '10:30 AM'] },
-      { dayOfWeek: 4, slots: ['01:00 PM', '02:00 PM', '03:30 PM'] },
-      { dayOfWeek: 6, slots: ['09:00 AM', '10:00 AM', '11:00 AM'] }
-    ]
+    about: 'Pediatrician offering child wellness visits, vaccinations, and general consultations.'
   },
   {
     name: 'Dr. Vivek Iyer',
@@ -52,12 +92,7 @@ export const doctorSeedData = [
     experience: 14,
     fee: 900,
     ratings: 4.6,
-    about: 'Orthopedic specialist for bone, joint, and sports injury consultations.',
-    availability: [
-      { dayOfWeek: 0, slots: ['10:00 AM', '11:00 AM', '12:00 PM'] },
-      { dayOfWeek: 2, slots: ['02:00 PM', '03:00 PM', '04:00 PM'] },
-      { dayOfWeek: 5, slots: ['09:30 AM', '10:30 AM', '11:30 AM'] }
-    ]
+    about: 'Orthopedic specialist for bone, joint, and sports injury consultations.'
   },
   {
     name: 'Dr. Neha Kapoor',
@@ -67,12 +102,7 @@ export const doctorSeedData = [
     experience: 10,
     fee: 950,
     ratings: 4.8,
-    about: 'Neurologist for migraines, seizures, nerve pain, and follow-up consultations.',
-    availability: [
-      { dayOfWeek: 1, slots: ['11:00 AM', '12:00 PM', '03:00 PM'] },
-      { dayOfWeek: 3, slots: ['09:00 AM', '10:30 AM', '01:30 PM'] },
-      { dayOfWeek: 6, slots: ['10:00 AM', '11:30 AM', '02:00 PM'] }
-    ]
+    about: 'Neurologist for migraines, seizures, nerve pain, and follow-up consultations.'
   },
   {
     name: 'Dr. Sanjay Verma',
@@ -82,12 +112,7 @@ export const doctorSeedData = [
     experience: 15,
     fee: 500,
     ratings: 4.5,
-    about: 'General physician for first-contact care, common illnesses, and routine medical advice.',
-    availability: [
-      { dayOfWeek: 0, slots: ['09:00 AM', '10:00 AM', '11:00 AM'] },
-      { dayOfWeek: 2, slots: ['01:00 PM', '02:00 PM', '04:00 PM'] },
-      { dayOfWeek: 4, slots: ['09:30 AM', '11:00 AM', '12:30 PM'] }
-    ]
+    about: 'General physician for first-contact care, common illnesses, and routine medical advice.'
   },
   {
     name: 'Dr. Farah Khan',
@@ -97,14 +122,12 @@ export const doctorSeedData = [
     experience: 8,
     fee: 720,
     ratings: 4.6,
-    about: 'ENT specialist for ear, nose, throat concerns and basic procedure consultations.',
-    availability: [
-      { dayOfWeek: 1, slots: ['08:30 AM', '09:30 AM', '01:00 PM'] },
-      { dayOfWeek: 4, slots: ['10:00 AM', '11:00 AM', '02:00 PM'] },
-      { dayOfWeek: 5, slots: ['09:00 AM', '12:00 PM', '03:00 PM'] }
-    ]
+    about: 'ENT specialist for ear, nose, throat concerns and basic procedure consultations.'
   }
-];
+].map((doctor) => ({
+  ...doctor,
+  availability: buildAvailability(`${doctor.email}:${doctor.specialization}`)
+}));
 
 export const demoPatientSeed = {
   name: 'Demo Patient',

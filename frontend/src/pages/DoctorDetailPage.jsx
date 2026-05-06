@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { FaArrowRight, FaCircleCheck } from 'react-icons/fa6';
@@ -10,12 +10,14 @@ import { useAuth } from '../context/AuthContext';
 
 const DoctorDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [doctor, setDoctor] = useState(null);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [reason, setReason] = useState('');
+  const [confirmationEmail, setConfirmationEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
 
@@ -40,6 +42,12 @@ const DoctorDetailPage = () => {
     loadDoctor();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (user?.email) {
+      setConfirmationEmail((current) => current || user.email);
+    }
+  }, [user?.email]);
 
   useEffect(() => {
     const loadSlots = async () => {
@@ -71,17 +79,23 @@ const DoctorDetailPage = () => {
       return;
     }
 
+    if (!confirmationEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(confirmationEmail)) {
+      toast.error('Please enter a valid confirmation email');
+      return;
+    }
+
     setBooking(true);
     try {
-      await api.post('/appointments', {
+      const { data } = await api.post('/appointments', {
         doctorId: doctor._id,
         appointmentDate: date,
         slotTime: selectedSlot,
-        reason
+        reason,
+        confirmationEmail
       });
       toast.success('Appointment booked successfully');
-      await loadDoctor();
-      setReason('');
+      sessionStorage.setItem('mediconnect:lastConfirmation', JSON.stringify(data));
+      navigate('/appointments/confirmation', { state: { appointment: data } });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Booking failed');
     } finally {
@@ -178,6 +192,17 @@ const DoctorDetailPage = () => {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Brief note about the consultation"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-brand-300"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Confirmation email</span>
+              <input
+                type="email"
+                value={confirmationEmail}
+                onChange={(e) => setConfirmationEmail(e.target.value)}
+                placeholder="patient@example.com"
                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none focus:border-brand-300"
               />
             </label>

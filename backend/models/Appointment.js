@@ -6,6 +6,7 @@ const appointmentSchema = new mongoose.Schema(
     doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor', required: true },
     appointmentDate: { type: Date, required: true },
     slotTime: { type: String, required: true, trim: true },
+    confirmationEmail: { type: String, default: '', lowercase: true, trim: true },
     status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' },
     reason: { type: String, trim: true, default: '' }
   },

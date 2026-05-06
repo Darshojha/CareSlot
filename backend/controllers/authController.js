@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import Doctor from '../models/Doctor.js';
 import { signToken } from '../utils/jwt.js';
+import { ensureSeedData } from '../utils/seedRuntime.js';
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
 
@@ -54,6 +55,8 @@ export const login = async (req, res) => {
   if (!isEmail(email)) {
     return res.status(400).json({ message: 'Please provide a valid email address' });
   }
+
+  await ensureSeedData();
 
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {

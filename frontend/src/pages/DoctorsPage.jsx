@@ -9,15 +9,20 @@ import Loader from '../components/Loader';
 const DoctorsPage = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filters, setFilters] = useState({ search: '', specialization: '', availableDate: '' });
 
   const fetchDoctors = async (currentFilters = filters) => {
     setLoading(true);
+    setError('');
     try {
       const { data } = await api.get('/doctors', { params: currentFilters });
       setDoctors(data);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to load doctors');
+      const message = error.response?.data?.message || 'Failed to load doctors';
+      setError(message);
+      setDoctors([]);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -84,6 +89,14 @@ const DoctorsPage = () => {
       <section className="mt-6">
         {loading ? (
           <Loader rows={4} />
+        ) : error ? (
+          <div className="rounded-2xl border border-rose-100 bg-white p-10 text-center shadow-soft">
+            <p className="text-lg font-semibold text-slate-900">Could not load doctors</p>
+            <p className="mt-2 text-sm text-slate-600">{error}</p>
+            <button onClick={() => fetchDoctors(filters)} className="mt-5 rounded-full bg-brand-600 px-5 py-3 font-semibold text-white transition hover:bg-brand-700">
+              Retry
+            </button>
+          </div>
         ) : doctors.length ? (
           <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
             {doctors.map((doctor) => (

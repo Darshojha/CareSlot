@@ -23,12 +23,6 @@ export const ensureSeedData = async () => {
   }
 
   globalForSeed.__mediconnectSeedPromise = (async () => {
-    const doctorCount = await Doctor.estimatedDocumentCount();
-    if (doctorCount > 0) {
-      console.log('[seed] doctors already present, skipping runtime seed');
-      return { seeded: false, reason: 'doctors already exist' };
-    }
-
     const createdDoctors = [];
 
     for (const doctor of doctorSeedData) {
@@ -45,8 +39,18 @@ export const ensureSeedData = async () => {
         { new: true, upsert: true }
       );
 
-      const existingDoctor = await Doctor.findOne({ userId: user._id });
+      let existingDoctor = await Doctor.findOne({ userId: user._id });
+      if (!existingDoctor) {
+        existingDoctor = await Doctor.findOne({
+          name: doctor.name,
+          specialization: doctor.specialization
+        });
+      }
       if (existingDoctor) {
+        if (existingDoctor.userId.toString() !== user._id.toString()) {
+          existingDoctor.userId = user._id;
+          await existingDoctor.save();
+        }
         createdDoctors.push(existingDoctor);
         continue;
       }
@@ -77,7 +81,10 @@ export const ensureSeedData = async () => {
       { new: true, upsert: true }
     );
 
-    const doctorDocs = createdDoctors;
+    const doctorDocs = await Doctor.find({
+      userId: { $in: createdDoctors.map((doctor) => doctor.userId) }
+    }).sort({ createdAt: 1 });
+
     const appointmentSamples = [
       {
         doctor: doctorDocs[0],
@@ -110,14 +117,16 @@ export const ensureSeedData = async () => {
           doctorId: sample.doctor._id,
           appointmentDate: nextDateForDay(sample.dayOfWeek, 1),
           slotTime: sample.slot,
+          confirmationEmail: demoPatientSeed.email,
           status: sample.status,
           reason: sample.reason
         });
       }
     }
 
-    console.log('[seed] runtime seed completed');
-    return { seeded: true, doctors: createdDoctors.length };
+    const doctorCount = await Doctor.countDocuments();
+    console.log('[seed] runtime seed completed', { doctors: doctorCount });
+    return { seeded: true, doctors: doctorCount };
   })();
 
   try {

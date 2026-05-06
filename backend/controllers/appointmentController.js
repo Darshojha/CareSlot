@@ -1,6 +1,8 @@
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 
+const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+
 const parseDateKey = (dateValue) => {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) {
@@ -39,15 +41,50 @@ const canUseSlot = async ({ doctorId, appointmentDate, slotTime, excludeId = nul
   return { ok: true, doctor };
 };
 
-export const createAppointment = async (req, res) => {
-  const { doctorId, appointmentDate, slotTime, reason = '' } = req.body;
+const buildEmailPreview = (appointment) => {
+  const appointmentDate = new Date(appointment.appointmentDate);
+  const formattedDate = new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(appointmentDate);
+  const doctorName = appointment.doctorId?.name || 'Doctor';
+  const patientName = appointment.patientId?.name || 'Patient';
+  const subject = `MediConnect appointment confirmation with ${doctorName}`;
+  const body = [
+    `Hello ${patientName},`,
+    '',
+    'Your appointment has been confirmed.',
+    `Doctor: ${doctorName}`,
+    `Specialization: ${appointment.doctorId?.specialization || 'N/A'}`,
+    `Date: ${formattedDate}`,
+    `Time: ${appointment.slotTime}`,
+    `Status: ${appointment.status}`,
+    `Reason: ${appointment.reason || 'Not provided'}`,
+    '',
+    'Please arrive a few minutes early.'
+  ].join('\n');
 
-  if (!doctorId || !appointmentDate || !slotTime) {
-    return res.status(400).json({ message: 'doctorId, appointmentDate and slotTime are required' });
+  return {
+    to: appointment.confirmationEmail,
+    subject,
+    body
+  };
+};
+
+export const createAppointment = async (req, res) => {
+  const { doctorId, appointmentDate, slotTime, reason = '', confirmationEmail = '' } = req.body;
+
+  if (!doctorId || !appointmentDate || !slotTime || !confirmationEmail) {
+    return res.status(400).json({ message: 'doctorId, appointmentDate, slotTime and confirmationEmail are required' });
   }
 
   if (!parseDateKey(appointmentDate)) {
     return res.status(400).json({ message: 'Invalid appointment date' });
+  }
+
+  if (!isEmail(confirmationEmail)) {
+    return res.status(400).json({ message: 'Please provide a valid confirmation email address' });
   }
 
   const check = await canUseSlot({ doctorId, appointmentDate, slotTime });
@@ -60,6 +97,7 @@ export const createAppointment = async (req, res) => {
     doctorId,
     appointmentDate: parseDateKey(appointmentDate),
     slotTime,
+    confirmationEmail: confirmationEmail.toLowerCase(),
     reason,
     status: 'scheduled'
   });
@@ -69,7 +107,10 @@ export const createAppointment = async (req, res) => {
     { path: 'doctorId', select: 'name specialization experience fee ratings about availability' }
   ]);
 
-  res.status(201).json(populated);
+  const response = populated.toObject();
+  response.emailPreview = buildEmailPreview(response);
+
+  res.status(201).json(response);
 };
 
 export const getMyAppointments = async (req, res) => {
