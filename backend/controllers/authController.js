@@ -12,7 +12,14 @@ const createTokenResponse = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
-  token: signToken({ id: user._id, role: user.role })
+  doctorId: user.doctorId || null,
+  token: signToken({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    doctorId: user.doctorId || null
+  })
 });
 
 const ensureSeedUser = async (seedUser, role, doctorSeed = null) => {
@@ -146,6 +153,14 @@ export const login = async (req, res) => {
   if (user.role === 'doctor') {
     const doctorProfile = await Doctor.findOne({ userId: user._id });
     payload.doctorId = doctorProfile?._id || null;
+    user.doctorId = payload.doctorId;
+    payload.token = signToken({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      doctorId: payload.doctorId
+    });
   }
 
   res.json(payload);
@@ -156,13 +171,9 @@ export const me = async (req, res) => {
     _id: req.user._id,
     name: req.user.name,
     email: req.user.email,
-    role: req.user.role
+    role: req.user.role,
+    doctorId: req.user.doctorId || null
   };
-
-  if (req.user.role === 'doctor') {
-    const doctorProfile = await Doctor.findOne({ userId: req.user._id });
-    payload.doctorId = doctorProfile?._id || null;
-  }
 
   res.json(payload);
 };

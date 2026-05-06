@@ -3,6 +3,17 @@ import api from '../services/api';
 
 const AuthContext = createContext(null);
 
+const decodeToken = (token) => {
+  try {
+    const payload = token.split('.')[1];
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '='));
+    return JSON.parse(json);
+  } catch (error) {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,8 +27,19 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const { data } = await api.get('/auth/me');
-      setUser(data);
+      const decoded = decodeToken(token);
+      if (decoded) {
+        setUser({
+          _id: decoded.id,
+          name: decoded.name,
+          email: decoded.email,
+          role: decoded.role,
+          doctorId: decoded.doctorId || null
+        });
+      } else {
+        localStorage.removeItem('mediconnect_token');
+        setUser(null);
+      }
     } catch (error) {
       localStorage.removeItem('mediconnect_token');
       setUser(null);

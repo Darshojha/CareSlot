@@ -2,7 +2,7 @@ import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
-import { doctorSeedData, findSeedDoctorById, getSeedDoctorId, seedDoctorRecords } from '../data/seedData.js';
+import { doctorSeedData, findSeedDoctorById, getSeedDoctorId } from '../data/seedData.js';
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
 
@@ -179,24 +179,16 @@ export const createAppointment = async (req, res) => {
 
 export const getMyAppointments = async (req, res) => {
   if (req.user.role === 'doctor') {
-    const doctorProfile = await Doctor.findOne({ userId: req.user._id });
-    if (!doctorProfile) {
+    const doctorId = req.user.doctorId;
+    if (!doctorId) {
       return res.json([]);
     }
-    const appointments = await Appointment.find({ doctorId: doctorProfile._id })
+    const appointments = await Appointment.find({ doctorId })
       .populate('patientId', 'name email role')
       .populate('doctorId', 'name specialization experience fee ratings about availability')
       .sort({ appointmentDate: 1, slotTime: 1 });
 
-    return res.json(
-      appointments.map((appointment) => {
-        const item = appointment.toObject();
-        if (!item.doctorId || typeof item.doctorId === 'string') {
-          item.doctorId = seedDoctorRecords.find((doctor) => doctor._id === String(appointment.doctorId)) || item.doctorId;
-        }
-        return item;
-      })
-    );
+    return res.json(appointments);
   }
 
   const appointments = await Appointment.find({ patientId: req.user._id })
@@ -204,15 +196,7 @@ export const getMyAppointments = async (req, res) => {
     .populate('doctorId', 'name specialization experience fee ratings about availability')
     .sort({ appointmentDate: 1, slotTime: 1 });
 
-  res.json(
-    appointments.map((appointment) => {
-      const item = appointment.toObject();
-      if (!item.doctorId || typeof item.doctorId === 'string') {
-        item.doctorId = seedDoctorRecords.find((doctor) => doctor._id === String(appointment.doctorId)) || item.doctorId;
-      }
-      return item;
-    })
-  );
+  res.json(appointments);
 };
 
 export const updateAppointment = async (req, res) => {
@@ -221,9 +205,9 @@ export const updateAppointment = async (req, res) => {
     return res.status(404).json({ message: 'Appointment not found' });
   }
 
-  const doctorProfile = req.user.role === 'doctor' ? await Doctor.findOne({ userId: req.user._id }) : null;
   const isPatientOwner = appointment.patientId.toString() === req.user._id.toString();
-  const isDoctorOwner = doctorProfile && appointment.doctorId.toString() === doctorProfile._id.toString();
+  const isDoctorOwner =
+    req.user.role === 'doctor' && req.user.doctorId && appointment.doctorId.toString() === req.user.doctorId.toString();
 
   if (!isPatientOwner && !isDoctorOwner) {
     return res.status(403).json({ message: 'Forbidden' });
@@ -285,9 +269,9 @@ export const cancelAppointment = async (req, res) => {
     return res.status(404).json({ message: 'Appointment not found' });
   }
 
-  const doctorProfile = req.user.role === 'doctor' ? await Doctor.findOne({ userId: req.user._id }) : null;
   const isPatientOwner = appointment.patientId.toString() === req.user._id.toString();
-  const isDoctorOwner = doctorProfile && appointment.doctorId.toString() === doctorProfile._id.toString();
+  const isDoctorOwner =
+    req.user.role === 'doctor' && req.user.doctorId && appointment.doctorId.toString() === req.user.doctorId.toString();
 
   if (!isPatientOwner && !isDoctorOwner) {
     return res.status(403).json({ message: 'Forbidden' });

@@ -1,10 +1,6 @@
-import User from '../models/User.js';
 import { verifyToken } from '../utils/jwt.js';
-import { connectDB } from '../config/db.js';
 
 export const protect = async (req, res, next) => {
-  await connectDB(process.env.MONGO_URI);
-
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Not authorized, token missing' });
@@ -13,13 +9,13 @@ export const protect = async (req, res, next) => {
   try {
     const token = authHeader.split(' ')[1];
     const decoded = verifyToken(token);
-    const user = await User.findById(decoded.id).select('-password');
-
-    if (!user) {
-      return res.status(401).json({ message: 'Not authorized, user not found' });
-    }
-
-    req.user = user;
+    req.user = {
+      _id: decoded.id,
+      name: decoded.name || 'User',
+      email: decoded.email || '',
+      role: decoded.role,
+      doctorId: decoded.doctorId || null
+    };
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Not authorized, token invalid' });
