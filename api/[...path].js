@@ -1,12 +1,29 @@
-import serverless from 'serverless-http';
-import dotenv from 'dotenv';
-dotenv.config();
+const serverless = require('serverless-http');
 
-import app from '../backend/app.js';
-import { connectDB } from '../backend/config/db.js';
-import { ensureSeedData } from '../backend/utils/seedRuntime.js';
+let appPromise;
+let bootPromise;
 
-await connectDB(process.env.MONGO_URI);
-await ensureSeedData();
+async function loadApp() {
+  if (!appPromise) {
+    appPromise = import('../backend/app.js').then((mod) => mod.default || mod);
+  }
+  return appPromise;
+}
 
-export default serverless(app);
+async function boot() {
+  if (!bootPromise) {
+    bootPromise = (async () => {
+      const { connectDB } = await import('../backend/config/db.js');
+      await connectDB(process.env.MONGO_URI);
+      const { ensureSeedData } = await import('../backend/utils/seedRuntime.js');
+      await ensureSeedData();
+    })();
+  }
+  return bootPromise;
+}
+
+module.exports = async (req, res) => {
+  await boot();
+  const app = await loadApp();
+  return serverless(app)(req, res);
+};
