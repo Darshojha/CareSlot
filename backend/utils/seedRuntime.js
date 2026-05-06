@@ -23,6 +23,17 @@ export const ensureSeedData = async () => {
   }
 
   globalForSeed.__mediconnectSeedPromise = (async () => {
+    const [doctorCount, demoPatient, demoDoctor] = await Promise.all([
+      Doctor.estimatedDocumentCount(),
+      User.findOne({ email: demoPatientSeed.email }).select('_id'),
+      User.findOne({ email: doctorSeedData[0].email }).select('_id')
+    ]);
+
+    if (doctorCount >= doctorSeedData.length && demoPatient && demoDoctor) {
+      console.log('[seed] runtime seed already present, skipping');
+      return { seeded: false, reason: 'already present' };
+    }
+
     const createdDoctors = [];
 
     for (const doctor of doctorSeedData) {
@@ -124,9 +135,9 @@ export const ensureSeedData = async () => {
       }
     }
 
-    const doctorCount = await Doctor.countDocuments();
-    console.log('[seed] runtime seed completed', { doctors: doctorCount });
-    return { seeded: true, doctors: doctorCount };
+    const totalDoctors = await Doctor.countDocuments();
+    console.log('[seed] runtime seed completed', { doctors: totalDoctors });
+    return { seeded: true, doctors: totalDoctors };
   })();
 
   try {

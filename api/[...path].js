@@ -15,8 +15,6 @@ async function boot() {
     bootPromise = (async () => {
       const { connectDB } = await import('../backend/config/db.js');
       await connectDB(process.env.MONGO_URI);
-      const { ensureSeedData } = await import('../backend/utils/seedRuntime.js');
-      await ensureSeedData();
     })();
   }
   return bootPromise;
