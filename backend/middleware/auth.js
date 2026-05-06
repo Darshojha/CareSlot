@@ -1,7 +1,10 @@
 import User from '../models/User.js';
 import { verifyToken } from '../utils/jwt.js';
+import { connectDB } from '../config/db.js';
 
 export const protect = async (req, res, next) => {
+  await connectDB(process.env.MONGO_URI);
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Not authorized, token missing' });

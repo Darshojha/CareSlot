@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import Doctor from '../models/Doctor.js';
+import { connectDB } from '../config/db.js';
 import { signToken } from '../utils/jwt.js';
 import { demoPatientSeed, doctorSeedData } from '../data/seedData.js';
 
@@ -52,6 +53,8 @@ const ensureSeedUser = async (seedUser, role, doctorSeed = null) => {
 };
 
 export const register = async (req, res) => {
+  await connectDB(process.env.MONGO_URI);
+
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
@@ -83,6 +86,8 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+  await connectDB(process.env.MONGO_URI);
+
   const { email, password } = req.body;
 
   if (!email || !password) {

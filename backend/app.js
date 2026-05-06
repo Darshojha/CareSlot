@@ -13,6 +13,14 @@ app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'MediConnect API is running',
+    docs: '/api/health'
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'MediConnect API running' });
 });
