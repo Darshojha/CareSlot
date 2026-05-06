@@ -31,7 +31,11 @@ export const connectDB = async (uri) => {
       return globalForMongoose.__mongooseConnectPromise;
     }
 
-    globalForMongoose.__mongooseConnectPromise = mongoose.connect(uri);
+    globalForMongoose.__mongooseConnectPromise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      maxPoolSize: 5
+    });
     const conn = await globalForMongoose.__mongooseConnectPromise;
     console.log(`MongoDB connected: ${conn.connection.host}`);
     return conn;

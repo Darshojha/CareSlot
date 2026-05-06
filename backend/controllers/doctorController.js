@@ -1,6 +1,5 @@
 import Doctor from '../models/Doctor.js';
 import Appointment from '../models/Appointment.js';
-import { ensureSeedData } from '../utils/seedRuntime.js';
 
 const parseDateKey = (dateValue) => {
   const date = new Date(dateValue);
@@ -13,8 +12,6 @@ const parseDateKey = (dateValue) => {
 const getDayIndex = (dateValue) => new Date(dateValue).getUTCDay();
 
 export const getDoctors = async (req, res) => {
-  await ensureSeedData();
-
   const { search = '', specialization = '', availableDate = '' } = req.query;
   const filters = {};
 
@@ -64,8 +61,6 @@ export const getDoctors = async (req, res) => {
 };
 
 export const getDoctorById = async (req, res) => {
-  await ensureSeedData();
-
   const doctor = await Doctor.findById(req.params.id);
 
   if (!doctor) {
@@ -76,8 +71,6 @@ export const getDoctorById = async (req, res) => {
 };
 
 export const getDoctorSlots = async (req, res) => {
-  await ensureSeedData();
-
   const doctor = await Doctor.findById(req.params.id);
   if (!doctor) {
     return res.status(404).json({ message: 'Doctor not found' });
