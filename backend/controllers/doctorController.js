@@ -1,5 +1,6 @@
 import Doctor from '../models/Doctor.js';
 import Appointment from '../models/Appointment.js';
+import { findSeedDoctorById, seedDoctorRecords } from '../data/seedData.js';
 
 const parseDateKey = (dateValue) => {
   const date = new Date(dateValue);
@@ -27,10 +28,22 @@ export const getDoctors = async (req, res) => {
   }
 
   const doctors = await Doctor.find(filters).sort({ ratings: -1, createdAt: -1 });
-  console.log('[doctor api] returning', doctors.length, 'doctors');
+  const fallbackDoctors = doctors.length
+    ? doctors
+    : seedDoctorRecords.filter((doctor) => {
+        const matchesSearch =
+          !search ||
+          doctor.name.toLowerCase().includes(search.toLowerCase()) ||
+          doctor.specialization.toLowerCase().includes(search.toLowerCase());
+        const matchesSpecialization =
+          !specialization || doctor.specialization.toLowerCase().includes(specialization.toLowerCase());
+        return matchesSearch && matchesSpecialization;
+      });
+
+  console.log('[doctor api] returning', fallbackDoctors.length, 'doctors');
 
   if (!availableDate) {
-    return res.json(doctors);
+    return res.json(fallbackDoctors);
   }
 
   if (!parseDateKey(availableDate)) {
@@ -50,7 +63,7 @@ export const getDoctors = async (req, res) => {
     return acc;
   }, {});
 
-  const availableDoctors = doctors.filter((doctor) => {
+  const availableDoctors = fallbackDoctors.filter((doctor) => {
     const daySchedule = doctor.availability.find((item) => item.dayOfWeek === dayIndex);
     if (!daySchedule) return false;
     const taken = bookedByDoctor[doctor._id.toString()] || new Set();
@@ -62,23 +75,28 @@ export const getDoctors = async (req, res) => {
 
 export const getDoctorById = async (req, res) => {
   const doctor = await Doctor.findById(req.params.id);
-
-  if (!doctor) {
-    return res.status(404).json({ message: 'Doctor not found' });
+  if (doctor) {
+    return res.json(doctor);
   }
 
-  res.json(doctor);
+  const seedDoctor = findSeedDoctorById(req.params.id);
+  if (seedDoctor) {
+    return res.json(seedDoctor);
+  }
+
+  return res.status(404).json({ message: 'Doctor not found' });
 };
 
 export const getDoctorSlots = async (req, res) => {
   const doctor = await Doctor.findById(req.params.id);
-  if (!doctor) {
+  const seedDoctor = doctor || findSeedDoctorById(req.params.id);
+  if (!seedDoctor) {
     return res.status(404).json({ message: 'Doctor not found' });
   }
 
   const availableDate = req.query.date;
   if (!availableDate) {
-    return res.json(doctor.availability);
+    return res.json(seedDoctor.availability);
   }
 
   if (Number.isNaN(new Date(availableDate).getTime())) {
@@ -86,9 +104,9 @@ export const getDoctorSlots = async (req, res) => {
   }
 
   const dayIndex = getDayIndex(availableDate);
-  const daySchedule = doctor.availability.find((item) => item.dayOfWeek === dayIndex);
+  const daySchedule = seedDoctor.availability.find((item) => item.dayOfWeek === dayIndex);
   const booked = await Appointment.find({
-    doctorId: doctor._id,
+    doctorId: seedDoctor._id,
     appointmentDate: parseDateKey(availableDate),
     status: 'scheduled'
   }).select('slotTime');
@@ -97,7 +115,7 @@ export const getDoctorSlots = async (req, res) => {
   const openSlots = daySchedule ? daySchedule.slots.filter((slot) => !takenSlots.has(slot)) : [];
 
   res.json({
-    doctorId: doctor._id,
+    doctorId: seedDoctor._id,
     date: availableDate,
     slots: openSlots,
     dayOfWeek: dayIndex

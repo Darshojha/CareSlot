@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 const slotPool = [
   '08:30 AM',
   '09:30 AM',
@@ -128,6 +130,25 @@ export const doctorSeedData = [
   ...doctor,
   availability: buildAvailability(`${doctor.email}:${doctor.specialization}`)
 }));
+
+export const getSeedDoctorId = (email) =>
+  crypto.createHash('md5').update(String(email).toLowerCase()).digest('hex').slice(0, 24);
+
+export const toSeedDoctorRecord = (doctor) => ({
+  _id: getSeedDoctorId(doctor.email),
+  userId: getSeedDoctorId(doctor.email),
+  name: doctor.name,
+  specialization: doctor.specialization,
+  experience: doctor.experience,
+  fee: doctor.fee,
+  ratings: doctor.ratings,
+  about: doctor.about,
+  availability: doctor.availability
+});
+
+export const seedDoctorRecords = doctorSeedData.map(toSeedDoctorRecord);
+
+export const findSeedDoctorById = (id) => seedDoctorRecords.find((doctor) => doctor._id === String(id)) || null;
 
 export const demoPatientSeed = {
   name: 'Demo Patient',

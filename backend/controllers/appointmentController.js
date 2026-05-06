@@ -1,5 +1,8 @@
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
+import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import { doctorSeedData, findSeedDoctorById, getSeedDoctorId, seedDoctorRecords } from '../data/seedData.js';
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
 
@@ -15,9 +18,12 @@ const getDayIndex = (dateValue) => new Date(dateValue).getUTCDay();
 
 const canUseSlot = async ({ doctorId, appointmentDate, slotTime, excludeId = null }) => {
   const doctor = await Doctor.findById(doctorId);
-  if (!doctor) return { ok: false, message: 'Doctor not found' };
+  const seedDoctor = doctor || findSeedDoctorById(doctorId);
+  if (!seedDoctor) return { ok: false, message: 'Doctor not found' };
 
-  const schedule = doctor.availability.find((item) => item.dayOfWeek === getDayIndex(appointmentDate));
+  const resolvedDoctor = doctor || seedDoctor;
+
+  const schedule = resolvedDoctor.availability.find((item) => item.dayOfWeek === getDayIndex(appointmentDate));
   if (!schedule || !schedule.slots.includes(slotTime)) {
     return { ok: false, message: 'Selected slot is not available for this date' };
   }
@@ -38,7 +44,53 @@ const canUseSlot = async ({ doctorId, appointmentDate, slotTime, excludeId = nul
     return { ok: false, message: 'This slot is already booked' };
   }
 
-  return { ok: true, doctor };
+  return { ok: true, doctor: resolvedDoctor };
+};
+
+const ensureSeedDoctorRecord = async (doctorId) => {
+  const seedDoctor = findSeedDoctorById(doctorId);
+  if (!seedDoctor) {
+    return null;
+  }
+
+  const baseSeed = doctorSeedData.find((doctor) => getSeedDoctorId(doctor.email) === String(doctorId));
+  const email = baseSeed?.email;
+  if (!email) {
+    return null;
+  }
+
+  const hashedPassword = await bcrypt.hash(baseSeed.password, 10);
+  const user = await User.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        name: baseSeed.name,
+        email,
+        password: hashedPassword,
+        role: 'doctor'
+      }
+    },
+    { new: true, upsert: true }
+  );
+
+  const doctor = await Doctor.findOneAndUpdate(
+    { userId: user._id },
+    {
+      $set: {
+        userId: user._id,
+        name: baseSeed.name,
+        specialization: baseSeed.specialization,
+        experience: baseSeed.experience,
+        fee: baseSeed.fee,
+        ratings: baseSeed.ratings,
+        about: baseSeed.about,
+        availability: baseSeed.availability
+      }
+    },
+    { new: true, upsert: true }
+  );
+
+  return doctor;
 };
 
 const buildEmailPreview = (appointment) => {
@@ -87,14 +139,26 @@ export const createAppointment = async (req, res) => {
     return res.status(400).json({ message: 'Please provide a valid confirmation email address' });
   }
 
-  const check = await canUseSlot({ doctorId, appointmentDate, slotTime });
+  let resolvedDoctorId = doctorId;
+  const existingDoctor = await Doctor.findById(doctorId);
+  if (!existingDoctor) {
+    const ensuredDoctor = await ensureSeedDoctorRecord(doctorId);
+    if (ensuredDoctor) {
+      resolvedDoctorId = ensuredDoctor._id;
+    }
+  }
+
+  let check = await canUseSlot({ doctorId: resolvedDoctorId, appointmentDate, slotTime });
+  if (!check.ok && resolvedDoctorId !== doctorId) {
+    check = await canUseSlot({ doctorId: doctorId, appointmentDate, slotTime });
+  }
   if (!check.ok) {
     return res.status(400).json({ message: check.message });
   }
 
   const appointment = await Appointment.create({
     patientId: req.user._id,
-    doctorId,
+    doctorId: resolvedDoctorId,
     appointmentDate: parseDateKey(appointmentDate),
     slotTime,
     confirmationEmail: confirmationEmail.toLowerCase(),
@@ -124,7 +188,15 @@ export const getMyAppointments = async (req, res) => {
       .populate('doctorId', 'name specialization experience fee ratings about availability')
       .sort({ appointmentDate: 1, slotTime: 1 });
 
-    return res.json(appointments);
+    return res.json(
+      appointments.map((appointment) => {
+        const item = appointment.toObject();
+        if (!item.doctorId || typeof item.doctorId === 'string') {
+          item.doctorId = seedDoctorRecords.find((doctor) => doctor._id === String(appointment.doctorId)) || item.doctorId;
+        }
+        return item;
+      })
+    );
   }
 
   const appointments = await Appointment.find({ patientId: req.user._id })
@@ -132,7 +204,15 @@ export const getMyAppointments = async (req, res) => {
     .populate('doctorId', 'name specialization experience fee ratings about availability')
     .sort({ appointmentDate: 1, slotTime: 1 });
 
-  res.json(appointments);
+  res.json(
+    appointments.map((appointment) => {
+      const item = appointment.toObject();
+      if (!item.doctorId || typeof item.doctorId === 'string') {
+        item.doctorId = seedDoctorRecords.find((doctor) => doctor._id === String(appointment.doctorId)) || item.doctorId;
+      }
+      return item;
+    })
+  );
 };
 
 export const updateAppointment = async (req, res) => {
