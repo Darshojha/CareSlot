@@ -3,22 +3,31 @@ import User from '../models/User.js';
 import Doctor from '../models/Doctor.js';
 import { connectDB } from '../config/db.js';
 import { signToken } from '../utils/jwt.js';
-import { demoPatientSeed, doctorSeedData } from '../data/seedData.js';
+import { demoPatientSeed, doctorSeedData, getSeedUserId, getSeedDoctorId } from '../data/seedData.js';
 
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
 
-const createTokenResponse = (user) => ({
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      timer.unref?.();
+    })
+  ]);
+
+const createTokenResponse = (user, overrides = {}) => ({
   _id: user._id,
   name: user.name,
   email: user.email,
   role: user.role,
-  doctorId: user.doctorId || null,
+  doctorId: (overrides.doctorId ?? user.doctorId) || null,
   token: signToken({
     id: user._id,
     name: user.name,
     email: user.email,
     role: user.role,
-    doctorId: user.doctorId || null
+    doctorId: (overrides.doctorId ?? user.doctorId) || null
   })
 });
 
@@ -60,41 +69,47 @@ const ensureSeedUser = async (seedUser, role, doctorSeed = null) => {
 };
 
 export const register = async (req, res) => {
-  await connectDB(process.env.MONGO_URI);
+  try {
+    await withTimeout(connectDB(process.env.MONGO_URI), 5000, 'Mongo connect');
 
-  const { name, email, password } = req.body;
+    const { name, email, password } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Name, email and password are required' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email and password are required' });
+    }
+
+    if (!isEmail(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const existing = await withTimeout(
+      User.findOne({ email: email.toLowerCase() }),
+      5000,
+      'User lookup'
+    );
+    if (existing) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      role: 'patient'
+    });
+
+    return res.status(201).json(createTokenResponse(user));
+  } catch (error) {
+    return res.status(503).json({ message: error.message || 'Registration temporarily unavailable' });
   }
-
-  if (!isEmail(email)) {
-    return res.status(400).json({ message: 'Please provide a valid email address' });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Password must be at least 6 characters' });
-  }
-
-  const existing = await User.findOne({ email: email.toLowerCase() });
-  if (existing) {
-    return res.status(400).json({ message: 'Email already registered' });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    name,
-    email: email.toLowerCase(),
-    password: hashedPassword,
-    role: 'patient'
-  });
-
-  res.status(201).json(createTokenResponse(user));
 };
 
 export const login = async (req, res) => {
-  await connectDB(process.env.MONGO_URI);
-
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -106,64 +121,85 @@ export const login = async (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase();
-  let user = await User.findOne({ email: normalizedEmail });
+  const demoPatientId = getSeedUserId(demoPatientSeed.email);
+  const demoDoctor = doctorSeedData.find((doctor) => doctor.email.toLowerCase() === normalizedEmail);
 
-  if (!user && normalizedEmail === demoPatientSeed.email) {
-    user = await ensureSeedUser(demoPatientSeed, 'patient');
-  }
-
-  if (!user) {
-    const seedDoctor = doctorSeedData.find((doctor) => doctor.email.toLowerCase() === normalizedEmail);
-    if (seedDoctor) {
-      user = await ensureSeedUser(seedDoctor, 'doctor', seedDoctor);
+  if (normalizedEmail === demoPatientSeed.email) {
+    if (password !== demoPatientSeed.password) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    return res.json(
+      createTokenResponse(
+        {
+          _id: demoPatientId,
+          name: demoPatientSeed.name,
+          email: demoPatientSeed.email,
+          role: 'patient'
+        },
+        { doctorId: null }
+      )
+    );
   }
 
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    const seedDoctor = doctorSeedData.find((doctor) => doctor.email.toLowerCase() === normalizedEmail);
-    const seedPatient = normalizedEmail === demoPatientSeed.email ? demoPatientSeed : null;
-
-    if (seedDoctor || seedPatient) {
-      user = await ensureSeedUser(seedDoctor || seedPatient, seedDoctor ? 'doctor' : 'patient', seedDoctor || null);
-      const retryMatch = await bcrypt.compare(password, user.password);
-      if (!retryMatch) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-
-      const retryPayload = createTokenResponse(user);
-      if (user.role === 'doctor') {
-        const doctorProfile = await Doctor.findOne({ userId: user._id });
-        retryPayload.doctorId = doctorProfile?._id || null;
-      }
-      return res.json(retryPayload);
+  if (demoDoctor) {
+    if (password !== demoDoctor.password) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    const doctorId = getSeedDoctorId(demoDoctor.email);
+    return res.json(
+      createTokenResponse(
+        {
+          _id: doctorId,
+          name: demoDoctor.name,
+          email: demoDoctor.email,
+          role: 'doctor'
+        },
+        { doctorId }
+      )
+    );
   }
 
-  if (!match) {
-    return res.status(401).json({ message: 'Invalid credentials' });
+  try {
+    await withTimeout(connectDB(process.env.MONGO_URI), 5000, 'Mongo connect');
+    const user = await withTimeout(
+      User.findOne({ email: normalizedEmail }),
+      5000,
+      'User lookup'
+    );
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const match = await withTimeout(bcrypt.compare(password, user.password), 5000, 'Password compare');
+    if (!match) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const payload = createTokenResponse(user);
+
+    if (user.role === 'doctor') {
+      const doctorProfile = await withTimeout(
+        Doctor.findOne({ userId: user._id }),
+        5000,
+        'Doctor lookup'
+      );
+      payload.doctorId = doctorProfile?._id || null;
+      payload.token = signToken({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        doctorId: payload.doctorId
+      });
+    }
+
+    return res.json(payload);
+  } catch (error) {
+    return res.status(503).json({ message: error.message || 'Login temporarily unavailable' });
   }
-
-  const payload = createTokenResponse(user);
-
-  if (user.role === 'doctor') {
-    const doctorProfile = await Doctor.findOne({ userId: user._id });
-    payload.doctorId = doctorProfile?._id || null;
-    user.doctorId = payload.doctorId;
-    payload.token = signToken({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      doctorId: payload.doctorId
-    });
-  }
-
-  res.json(payload);
 };
 
 export const me = async (req, res) => {

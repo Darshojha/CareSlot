@@ -134,6 +134,8 @@ export const doctorSeedData = [
 export const getSeedDoctorId = (email) =>
   crypto.createHash('md5').update(String(email).toLowerCase()).digest('hex').slice(0, 24);
 
+export const getSeedUserId = (email) => getSeedDoctorId(email);
+
 export const toSeedDoctorRecord = (doctor) => ({
   _id: getSeedDoctorId(doctor.email),
   userId: getSeedDoctorId(doctor.email),
