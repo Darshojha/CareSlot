@@ -2,44 +2,36 @@
 
 MediConnect is a full-stack healthcare appointment booking system built with the MERN stack.
 
-This repository originated from the `CareSlot` project name on GitHub.
-
-## Stack
-
-- Frontend: React.js, Tailwind CSS, Framer Motion, React Router, Axios, React Icons, Toastify
-- Backend: Node.js, Express.js, MongoDB Atlas, JWT, bcrypt
-
-## Features
+## What is included
 
 - Patient registration and login
 - Doctor login with seeded demo accounts
-- JWT-based protected routes
-- Doctor search and filtering
-- Doctor profile pages with availability and booking
+- JWT-protected routes
+- Doctor search, filters, and profiles
 - Appointment booking, rescheduling, cancellation, and status updates
-- Patient dashboard and doctor dashboard
-- Availability management for doctors
-- Seed data for quick setup
+- Patient and doctor dashboards
+- Doctor availability management
+- Seed data for quick demo setup
 
-## Project Structure
+## Tech Stack
 
-- `backend` - Express API, models, controllers, routes, seed script
-- `frontend` - React app with Tailwind UI and dashboards
+- Frontend: React, Tailwind CSS, Framer Motion, React Router, Axios, React Icons, Toastify
+- Backend: Node.js, Express.js, MongoDB Atlas, JWT, bcrypt
 
 ## Setup
 
-1. Install dependencies from the repo root:
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Create environment files:
+2. Add environment files:
 
 - Copy `backend/.env.example` to `backend/.env`
 - Copy `frontend/.env.example` to `frontend/.env`
 
-3. Set your MongoDB Atlas connection string in `backend/.env`.
+3. Configure `backend/.env` with your MongoDB Atlas URI and JWT secret.
 
 4. Seed the database:
 
@@ -47,69 +39,40 @@ npm install
 npm run seed
 ```
 
-5. Start both apps:
+5. Start development:
 
 ```bash
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173` and backend on `http://localhost:5000`.
-
 ## Demo Accounts
 
-Patient:
+- Patient: `patient@mediconnect.com` / `Password123!`
+- Doctor: `aanya@mediconnect.com` / `Password123!`
 
-- Email: `patient@mediconnect.com`
-- Password: `Password123!`
-
-Doctor:
-
-- Email: `aanya@mediconnect.com`
-- Password: `Password123!`
-
-## API Endpoints
-
-### Auth
+## API
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
-
-### Doctors
-
 - `GET /api/doctors`
 - `GET /api/doctors/:id`
 - `GET /api/doctors/:id/slots`
 - `PATCH /api/doctors/:id/slots`
-
-### Appointments
-
 - `POST /api/appointments`
 - `GET /api/appointments/me`
 - `PATCH /api/appointments/:id`
-- `DELETE /api/appointments/:id` (soft-cancels the appointment)
+- `DELETE /api/appointments/:id`
 
-## Notes
+## Deployment
 
-- Registration is for patients.
-- Doctor accounts are seeded and can log in directly.
-- Appointment conflict checks prevent double booking for the same doctor, date, and slot.
-
-## Vercel Deployment
-
-This repo is configured for a single Vercel deployment from the project root.
+This repo is configured for Vercel deployment from the root.
 
 Set these environment variables in Vercel:
 
 - `MONGO_URI`
 - `JWT_SECRET`
-- `CLIENT_URL` set to your Vercel domain, or leave it broad if you use preview deployments
+- `CLIENT_URL`
 - `VITE_API_BASE_URL=/api`
 
-The deployment config is in `vercel.json`. The frontend builds to `frontend/dist`, and the API is served from the `api` folder.
-
-Before going live, run the seed script against your Atlas database so the doctor profiles and demo appointments are present:
-
-```bash
-npm run seed
-```
+The deployment config is in `vercel.json`. The frontend builds to `frontend/dist`, and the API is served from `api/[...path].js`.
