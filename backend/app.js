@@ -7,32 +7,8 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 const app = express();
 
-const allowedOrigins = new Set(
-  String(process.env.CLIENT_URL || 'http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-);
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      const localhostPattern = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-      const vercelPreviewPattern = /^https:\/\/.*\.vercel\.app$/;
-
-      if (allowedOrigins.has(origin) || localhostPattern.test(origin) || vercelPreviewPattern.test(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true
-  })
-);
+app.use(cors({ origin: true, credentials: false }));
+app.options('*', cors({ origin: true, credentials: false }));
 app.use(helmet());
 app.use(express.json());
 app.use(morgan('dev'));
