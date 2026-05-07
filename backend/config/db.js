@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import dns from 'node:dns';
+
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const globalForMongoose = globalThis;
 
@@ -32,8 +35,8 @@ export const connectDB = async (uri) => {
     }
 
     globalForMongoose.__mongooseConnectPromise = mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
       maxPoolSize: 5
     });
     const conn = await globalForMongoose.__mongooseConnectPromise;
