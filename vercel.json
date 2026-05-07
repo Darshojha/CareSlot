@@ -18,12 +18,6 @@
     "api/doctors/[...path].js": {
       "maxDuration": 30
     },
-    "api/doctors/[id].js": {
-      "maxDuration": 30
-    },
-    "api/doctors/[id]/slots.js": {
-      "maxDuration": 30
-    },
     "api/appointments/[...path].js": {
       "maxDuration": 30
     }

@@ -144,6 +144,30 @@ const routeRequest = async (req, res, pathname) => {
     return;
   }
 
+  if (pathname === '/api/doctors/slots' || pathname === '/doctors/slots') {
+    if (!req.query.id) {
+      res.status(400).json({ message: 'Doctor id is required' });
+      return;
+    }
+
+    req.params = { id: req.query.id };
+    const { getDoctorSlots, updateDoctorSlots } = await import('../backend/controllers/doctorController.js');
+
+    if (req.method === 'GET') {
+      await getDoctorSlots(req, res);
+      return;
+    }
+
+    if (req.method === 'PATCH') {
+      if (!(await applyAuth(req, res))) return;
+      if (!(await requireDatabase(res))) return;
+      await updateDoctorSlots(req, res);
+      return;
+    }
+
+    return sendMethodNotAllowed(res);
+  }
+
   const doctorSlotsMatch = pathname.match(/^\/(?:api\/)?doctors\/([^/]+)\/slots$/);
   if (doctorSlotsMatch) {
     req.params = { id: decodeURIComponent(doctorSlotsMatch[1]) };

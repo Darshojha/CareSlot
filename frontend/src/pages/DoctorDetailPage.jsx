@@ -26,7 +26,7 @@ const DoctorDetailPage = () => {
     try {
       const [doctorRes, slotRes] = await Promise.all([
         api.get(`/doctors/${id}`),
-        api.get(`/doctors/${id}/slots`, { params: { date } })
+        api.get('/doctors/slots', { params: { id, date } })
       ]);
       setDoctor(doctorRes.data);
       setSlots(slotRes.data.slots || []);
@@ -52,7 +52,7 @@ const DoctorDetailPage = () => {
   useEffect(() => {
     const loadSlots = async () => {
       try {
-        const { data } = await api.get(`/doctors/${id}/slots`, { params: { date } });
+        const { data } = await api.get('/doctors/slots', { params: { id, date } });
         setSlots(data.slots || []);
         setSelectedSlot(data.slots?.[0] || '');
       } catch (error) {
