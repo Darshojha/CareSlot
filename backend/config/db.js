@@ -1,9 +1,20 @@
 import mongoose from 'mongoose';
-import dns from 'node:dns';
-
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const globalForMongoose = globalThis;
+
+const getTimeout = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      timer.unref?.();
+    })
+  ]);
 
 const getMongoHost = (uri) => {
   try {
@@ -13,19 +24,20 @@ const getMongoHost = (uri) => {
   }
 };
 
-export const connectDB = async (uri) => {
+export const connectDB = async (uri, options = {}) => {
   if (!uri) {
     throw new Error('MONGO_URI is required');
   }
 
-  try {
-    const host = getMongoHost(uri);
-    if (host && host.endsWith('careslot.mongodb.net')) {
-      throw new Error(
-        'MONGO_URI points to careslot.mongodb.net, but the Atlas host should include the full cluster subdomain such as careslot.9xkyfgv.mongodb.net'
-      );
-    }
+  const timeoutMS = getTimeout(options.timeoutMS ?? process.env.MONGO_CONNECT_TIMEOUT_MS, 5000);
+  const host = getMongoHost(uri);
+  if (host && host.endsWith('careslot.mongodb.net')) {
+    throw new Error(
+      'MONGO_URI points to careslot.mongodb.net, but the Atlas host should include the full cluster subdomain such as careslot.9xkyfgv.mongodb.net'
+    );
+  }
 
+  try {
     if (mongoose.connection.readyState === 1) {
       return mongoose.connection;
     }
@@ -34,11 +46,15 @@ export const connectDB = async (uri) => {
       return globalForMongoose.__mongooseConnectPromise;
     }
 
-    globalForMongoose.__mongooseConnectPromise = mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 15000,
-      connectTimeoutMS: 15000,
-      maxPoolSize: 5
+    const connectPromise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: timeoutMS,
+      connectTimeoutMS: timeoutMS,
+      socketTimeoutMS: Math.max(timeoutMS * 2, 10000),
+      maxPoolSize: 5,
+      family: 4
     });
+
+    globalForMongoose.__mongooseConnectPromise = withTimeout(connectPromise, timeoutMS + 1000, 'Mongo connect');
     const conn = await globalForMongoose.__mongooseConnectPromise;
     console.log(`MongoDB connected: ${conn.connection.host}`);
     return conn;

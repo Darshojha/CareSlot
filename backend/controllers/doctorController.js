@@ -1,5 +1,9 @@
+import mongoose from 'mongoose';
 import Doctor from '../models/Doctor.js';
+import { connectDB } from '../config/db.js';
 import { findSeedDoctorById, seedDoctorRecords } from '../data/seedData.js';
+
+const OPTIONAL_DB_TIMEOUT_MS = 1500;
 
 const parseDateKey = (dateValue) => {
   const date = new Date(dateValue);
@@ -10,6 +14,41 @@ const parseDateKey = (dateValue) => {
 };
 
 const getDayIndex = (dateValue) => new Date(dateValue).getUTCDay();
+
+const connectOptionalDatabase = async () => {
+  if (!process.env.MONGO_URI) {
+    return { ok: false, configured: false };
+  }
+
+  try {
+    await connectDB(process.env.MONGO_URI, { timeoutMS: OPTIONAL_DB_TIMEOUT_MS });
+    return { ok: true, configured: true };
+  } catch (error) {
+    console.warn('Optional MongoDB lookup skipped:', error.message);
+    return { ok: false, configured: true, error };
+  }
+};
+
+const findDatabaseDoctorById = async (id) => {
+  if (!mongoose.isValidObjectId(id)) {
+    return { doctor: null, database: { ok: false, configured: false } };
+  }
+
+  const database = await connectOptionalDatabase();
+  if (!database.ok) {
+    return { doctor: null, database };
+  }
+
+  try {
+    const doctor = await Doctor.findById(id);
+    return { doctor, database };
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return { doctor: null, database };
+    }
+    throw error;
+  }
+};
 
 export const getDoctors = async (req, res) => {
   const { search = '', specialization = '', availableDate = '' } = req.query;
@@ -51,9 +90,13 @@ export const getDoctorById = async (req, res) => {
     return res.json(seedDoctor);
   }
 
-  const doctor = await Doctor.findById(req.params.id);
+  const { doctor, database } = await findDatabaseDoctorById(req.params.id);
   if (doctor) {
     return res.json(doctor);
+  }
+
+  if (database.configured && database.error) {
+    return res.status(503).json({ message: 'Doctor database temporarily unavailable' });
   }
 
   return res.status(404).json({ message: 'Doctor not found' });
@@ -62,8 +105,11 @@ export const getDoctorById = async (req, res) => {
 export const getDoctorSlots = async (req, res) => {
   const seedDoctor = findSeedDoctorById(req.params.id);
   if (!seedDoctor) {
-    const doctor = await Doctor.findById(req.params.id);
+    const { doctor, database } = await findDatabaseDoctorById(req.params.id);
     if (!doctor) {
+      if (database.configured && database.error) {
+        return res.status(503).json({ message: 'Doctor database temporarily unavailable' });
+      }
       return res.status(404).json({ message: 'Doctor not found' });
     }
     return res.json({

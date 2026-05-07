@@ -5,9 +5,8 @@ let handlerPromise;
 async function getHandler() {
   if (!handlerPromise) {
     handlerPromise = (async () => {
-      const { connectDB } = await import('../backend/config/db.js');
-      await connectDB(process.env.MONGO_URI);
-      const { default: app } = await import('../backend/app.js');
+      const appModule = await import('../backend/app.js');
+      const app = appModule.default || appModule;
       return serverless(app);
     })();
   }
@@ -19,6 +18,7 @@ module.exports = async (req, res) => {
     const handler = await getHandler();
     return handler(req, res);
   } catch (error) {
+    console.error('Handler error:', error);
     handlerPromise = null;
     res.status(500).json({ error: 'Internal server error', message: error.message });
   }

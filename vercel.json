@@ -6,7 +6,19 @@
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "functions": {
+    "api/health.js": {
+      "maxDuration": 30
+    },
     "api/[...path].js": {
+      "maxDuration": 30
+    },
+    "api/auth/[...path].js": {
+      "maxDuration": 30
+    },
+    "api/doctors/[...path].js": {
+      "maxDuration": 30
+    },
+    "api/appointments/[...path].js": {
       "maxDuration": 30
     }
   },
