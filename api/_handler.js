@@ -1,15 +1,25 @@
 const serverless = require('serverless-http');
 
-let appPromise;
+let handlerPromise;
 
-async function loadApp() {
-  if (!appPromise) {
-    appPromise = import('../backend/app.js').then((mod) => mod.default || mod);
+async function getHandler() {
+  if (!handlerPromise) {
+    handlerPromise = (async () => {
+      const { connectDB } = await import('../backend/config/db.js');
+      await connectDB(process.env.MONGO_URI);
+      const { default: app } = await import('../backend/app.js');
+      return serverless(app);
+    })();
   }
-  return appPromise;
+  return handlerPromise;
 }
 
 module.exports = async (req, res) => {
-  const app = await loadApp();
-  return serverless(app)(req, res);
+  try {
+    const handler = await getHandler();
+    return handler(req, res);
+  } catch (error) {
+    handlerPromise = null;
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
 };
