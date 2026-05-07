@@ -55,7 +55,7 @@ const DoctorDashboard = () => {
     if (!doctorId) return;
     setSaving(true);
     try {
-      await api.patch(`/doctors/${doctorId}/slots`, { availability });
+      await api.patch('/doctors/slots', { availability }, { params: { id: doctorId } });
       toast.success('Availability updated');
       fetchData();
     } catch (error) {
